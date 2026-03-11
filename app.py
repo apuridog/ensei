@@ -1,86 +1,127 @@
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime
+from geopy.geocoders import Nominatim
 
 # --- ページ設定 ---
 st.set_page_config(page_title="遠征告知ツール", layout="centered")
 
-st.title("🏀 遠征告知 & ルート逆算ツール")
-st.caption("リスト選択と自由入力、どちらも対応可能です。")
+st.title("🏀 遠征告知作成ツール")
+st.caption("会場名を入力して「🔍検索」を押すと住所を自動取得します。")
 
-# --- 1. 会場データベース ---
-VENUES = {
-    "【選択してください】": {"address": "", "travel_min": 0},
-    "代々木第二体育館": {"address": "東京都渋谷区神南２丁目１−１", "travel_min": 15},
-    "大田区総合体育館": {"address": "東京都大田区東蒲田１丁目１１−１", "travel_min": 40},
-    "横浜武道館": {"address": "神奈川県横浜市中区翁町２丁目９−１０", "travel_min": 50},
-    "その他（手入力）": {"address": "", "travel_min": 0}
-}
+# --- 1. 会場と住所検索 ---
+st.header("1. 会場・住所の設定")
+venue_name = st.text_input("会場名（学校名や体育館名）", "江戸川区立小松川第二中学校")
 
-# --- 2. 入力エリア ---
-st.header("1. 基本設定")
-col1, col2 = st.columns(2)
+# 住所を一時保存する仕組み
+if "address" not in st.session_state:
+    st.session_state.address = "東京都江戸川区小松川２丁目１０−２"
+
+# 自動検索ボタン
+if st.button("🔍 会場名から住所を自動検索"):
+    if venue_name:
+        with st.spinner("住所を検索中..."):
+            try:
+                # 無料の地図データベース（OpenStreetMap）から検索
+                geolocator = Nominatim(user_agent="basketball_team_app")
+                location = geolocator.geocode(venue_name)
+                if location:
+                    st.session_state.address = location.address
+                    st.success("住所を取得しました！（※表記が不自然な場合は手直ししてください）")
+                else:
+                    st.warning("住所が見つかりませんでした。Googleマップ等で確認し手入力をお願いします。")
+            except:
+                st.error("検索エラーが発生しました。手入力をお願いします。")
+    else:
+        st.warning("先に会場名を入力してください。")
+
+# 検索結果がここに入ります（手で修正も可能）
+address = st.text_input("会場住所", st.session_state.address)
+
+
+# --- 2. 日時・スケジュールの設定 ---
+st.header("2. 日時・スケジュール")
+col1, col2 = st.columns([2, 1])
 with col1:
     date = st.date_input("試合日程", datetime.now())
 with col2:
-    event_name = st.text_input("イベント名", "練習試合")
+    is_holiday = st.checkbox("祝日マーク(・祝)をつける", value=False)
 
-# 会場選択の仕組み
-venue_choice = st.selectbox("会場リストから選択", list(VENUES.keys()))
-venue_info = VENUES[venue_choice]
-
-# 【重要】「その他」を選んだ時だけ入力欄を表示
-if venue_choice == "その他（手入力）" or venue_choice == "【選択してください】":
-    final_venue_name = st.text_input("会場名を入力してください", placeholder="例：〇〇中学校")
-else:
-    # リストから選んだ場合でも、名前を微調整できるようにする
-    final_venue_name = st.text_input("会場名（修正も可能です）", value=venue_choice)
-
-# 住所と時間の入力
-address = st.text_input("会場住所", value=venue_info["address"], placeholder="例：東京都新宿区...")
-travel_time = st.number_input("新宿駅からの移動時間（分）", value=venue_info["travel_min"])
-
-st.header("2. 時間の設定")
 col3, col4 = st.columns(2)
 with col3:
-    local_time = st.time_input("現地集合時間", datetime.strptime("09:00", "%H:%M"))
+    time_shinjuku = st.text_input("①新宿駅南口 集合時間", "6:50")
 with col4:
-    buffer_min = st.slider("新宿駅での集合余裕（分）", 0, 30, 10)
+    time_local = st.text_input("②現地集合 集合時間", "7:50")
 
-# --- 3. ロジック計算 ---
-dummy_dt = datetime.combine(date, local_time)
-shinjuku_dt = dummy_dt - timedelta(minutes=(travel_time + buffer_min))
-shinjuku_time_str = shinjuku_dt.strftime("%H:%M")
+col5, col6 = st.columns(2)
+with col5:
+    match_start = st.text_input("試合開始予定", "8:00")
+with col6:
+    match_end = st.text_input("試合終了予定", "12:30")
 
+
+# --- 3. カテゴリー・参加費 ---
+st.header("3. カテゴリー・参加費")
+col7, col8 = st.columns(2)
+with col7:
+    gender = st.selectbox("性別", ["男子", "女子", "男女"])
+with col8:
+    age_group = st.selectbox("年代", ["U12", "U15", "U12/15"])
+
+fee_option = st.radio("参加費", ["無し", "有り（金額を手入力）"], horizontal=True)
+if fee_option == "有り（金額を手入力）":
+    fee = st.text_input("参加費を入力", "1,000円")
+else:
+    fee = "無し"
+
+
+# --- 4. 緊急連絡先 ---
+st.header("4. 緊急連絡先")
+col9, col10 = st.columns(2)
+with col9:
+    contact_name = st.text_input("担当者名", "鎌田")
+with col10:
+    contact_phone = st.text_input("電話番号", "080-4835-1204")
+
+
+# --- 告知文の組み立てロジック ---
+# 曜日の日本語変換＋祝日対応
 weeks = ["月", "火", "水", "木", "金", "土", "日"]
 day_of_week = weeks[date.weekday()]
+if is_holiday:
+    day_of_week += "・祝"
 
-# Googleマップ検索URL（住所があれば作成）
-maps_url = f"https://www.google.com/maps/dir/新宿駅/{address}" if address else "住所未入力"
+# カテゴリーの結合
+category_text = f"{gender}{age_group}"  # 例：男女U12/15
 
-# --- 4. 告知文の組み立て ---
-result_text = f"""【{date.month}/{date.day}({day_of_week}) {event_name}】
+# テンプレートへの流し込み
+result_text = f"""【{date.month}/{date.day}({day_of_week}) {venue_name}】
 
-〈集合時間〉
-①新宿駅南口 {shinjuku_time_str}
-（移動{travel_time}分 ＋ 集合余裕{buffer_min}分 を考慮）
+＜集合時間＞
+①新宿駅南口 集合時間 {time_shinjuku}
+②現地集合 集合時間 {time_local}
+ノートのコメント欄に移動方法をお願いします。
 
-②現地集合時間 {local_time.strftime("%H:%M")}
+＜カテゴリー＞
+{category_text}
 
-〈会場〉
-・{final_venue_name}
- ({address})
+＜試合時間（予定）＞
+・{match_start}~{match_end}
 
-〈ルート確認（Googleマップ）〉
-{maps_url}
+〈参加費〉
+{fee}
 
-＊当日急なトラブルなどありましたらご連絡ください。"""
+＜試合会場＞
+・{venue_name}
+{address}
+
+＜緊急連絡先＞
+・{contact_name}
+{contact_phone}
+＊当日急な体調不良やトラブルなどありましたらご連絡ください。"""
+
 
 # --- 5. 画面表示 ---
 st.divider()
-st.subheader("💡 逆算されたスケジュール")
-st.success(f"新宿駅に **{shinjuku_time_str}** に集合すれば間に合います。")
-
-st.divider()
-st.subheader("📝 コピー用テキスト")
+st.subheader("📝 完成した告知文")
 st.code(result_text, language="text")
-st.info("右上のアイコンをタップしてコピーしてください。")
+st.info("右上のアイコンをタップしてコピーし、ノート等に貼り付けてください。")
