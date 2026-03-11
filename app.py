@@ -1,41 +1,24 @@
 import streamlit as st
 from datetime import datetime
-from geopy.geocoders import Nominatim
+import urllib.parse
 
 # --- ページ設定 ---
 st.set_page_config(page_title="遠征告知ツール", layout="centered")
 
 st.title("🏀 遠征告知作成ツール")
-st.caption("会場名を入力して「🔍検索」を押すと住所を自動取得します。")
 
 # --- 1. 会場と住所検索 ---
 st.header("1. 会場・住所の設定")
 venue_name = st.text_input("会場名（学校名や体育館名）", "江戸川区立小松川第二中学校")
 
-# 住所を一時保存する仕組み
-if "address" not in st.session_state:
-    st.session_state.address = "東京都江戸川区小松川２丁目１０−２"
+# Googleマップ検索リンクの生成
+encoded_venue = urllib.parse.quote(venue_name)
+google_maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_venue}"
 
-# 自動検索ボタン
-if st.button("🔍 会場名から住所を自動検索"):
-    if venue_name:
-        with st.spinner("住所を検索中..."):
-            try:
-                # 無料の地図データベース（OpenStreetMap）から検索
-                geolocator = Nominatim(user_agent="basketball_team_app")
-                location = geolocator.geocode(venue_name)
-                if location:
-                    st.session_state.address = location.address
-                    st.success("住所を取得しました！（※表記が不自然な場合は手直ししてください）")
-                else:
-                    st.warning("住所が見つかりませんでした。Googleマップ等で確認し手入力をお願いします。")
-            except:
-                st.error("検索エラーが発生しました。手入力をお願いします。")
-    else:
-        st.warning("先に会場名を入力してください。")
+st.write("▼ 会場の住所がわからない場合はこちら")
+st.link_button("🗺️ Googleマップで住所を検索する", google_maps_url)
 
-# 検索結果がここに入ります（手で修正も可能）
-address = st.text_input("会場住所", st.session_state.address)
+address = st.text_input("会場住所", "東京都江戸川区小松川２丁目１０−２")
 
 
 # --- 2. 日時・スケジュールの設定 ---
@@ -76,11 +59,22 @@ else:
 
 # --- 4. 緊急連絡先 ---
 st.header("4. 緊急連絡先")
+
+# 連絡先データベース
+CONTACTS = {
+    "鎌田": "080-4835-1204",
+    "髙草": "080-2335-6985",
+    "その他（手入力）": ""
+}
+
+# 担当者の選択
+contact_choice = st.selectbox("担当者を選択", list(CONTACTS.keys()))
+
 col9, col10 = st.columns(2)
 with col9:
-    contact_name = st.text_input("担当者名", "鎌田")
+    contact_name = st.text_input("担当者名", contact_choice if contact_choice != "その他（手入力）" else "")
 with col10:
-    contact_phone = st.text_input("電話番号", "080-4835-1204")
+    contact_phone = st.text_input("電話番号", CONTACTS.get(contact_choice, "") if contact_choice != "その他（手入力）" else "")
 
 
 # --- 告知文の組み立てロジック ---
@@ -91,9 +85,9 @@ if is_holiday:
     day_of_week += "・祝"
 
 # カテゴリーの結合
-category_text = f"{gender}{age_group}"  # 例：男女U12/15
+category_text = f"{gender}{age_group}"
 
-# テンプレートへの流し込み
+# テンプレートへの流し込み（ご指定のフォーマットに完全準拠）
 result_text = f"""【{date.month}/{date.day}({day_of_week}) {venue_name}】
 
 ＜集合時間＞
