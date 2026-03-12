@@ -8,7 +8,7 @@ st.set_page_config(page_title="遠征告知ツール", layout="centered")
 
 st.title("🏀 遠征告知作成ツール")
 
-# --- 初期値の設定（自動入力機能のため） ---
+# --- 初期値の設定 ---
 if 'target_date' not in st.session_state: st.session_state.target_date = datetime.now()
 if 'venue_name' not in st.session_state: st.session_state.venue_name = "江戸川区立小松川第二中学校"
 if 'time_shinjuku' not in st.session_state: st.session_state.time_shinjuku = "6:50"
@@ -25,7 +25,6 @@ pasted_text = st.text_area("ここに案内文を貼り付け", height=100, plac
 
 if st.button("✨ テキストから日時や場所を自動入力"):
     if pasted_text:
-        # 日付の抽出 (例: 3/20 や 3月20日)
         date_match = re.search(r'(\d{1,2})\s*[月/]\s*(\d{1,2})', pasted_text)
         if date_match:
             try:
@@ -33,41 +32,36 @@ if st.button("✨ テキストから日時や場所を自動入力"):
                 st.session_state.target_date = datetime(year, int(date_match.group(1)), int(date_match.group(2)))
             except: pass
 
-        # 新宿集合時間の抽出
         shinjuku_match = re.search(r'新宿.*?(\d{1,2}[:：]\d{2})', pasted_text)
         if shinjuku_match: st.session_state.time_shinjuku = shinjuku_match.group(1).replace('：', ':')
 
-        # 現地集合時間の抽出
         local_match = re.search(r'現地.*?(\d{1,2}[:：]\d{2})', pasted_text)
         if local_match: st.session_state.time_local = local_match.group(1).replace('：', ':')
 
-        # 試合時間の抽出 (例: 8:00~12:30)
         match_time = re.search(r'(\d{1,2}[:：]\d{2})\s*[~〜-]\s*(\d{1,2}[:：]\d{2})', pasted_text)
         if match_time:
             st.session_state.match_start = match_time.group(1).replace('：', ':')
             st.session_state.match_end = match_time.group(2).replace('：', ':')
 
-        # 会場名の抽出 (中学校、体育館などの文字を探す)
         venue_match = re.search(r'([^\s　【】＜＞<>\[\]()（）]+(?:中学校|高等学校|高校|体育館|スポーツセンター|アリーナ|武道館|ドーム))', pasted_text)
         if venue_match:
             st.session_state.venue_name = venue_match.group(1)
 
-        st.success("読み込み完了！下の項目に反映しました（※読み取れなかった部分は手入力で補ってください）")
+        st.success("読み込み完了！下の項目に反映しました")
 
 
 # ==========================================
 # 1. 会場・住所の設定
 # ==========================================
 st.header("1. 会場・住所の設定")
-# keyを設定することで、上の自動抽出結果がここに入ります
 venue_name = st.text_input("会場名（学校名や体育館名）", key="venue_name")
 
-# Googleマップ検索リンク（スマホ対応の公式URLに変更しました）
+# 会場名のみでのGoogleマップ検索
 encoded_venue = urllib.parse.quote(venue_name)
 google_maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_venue}"
 
 st.write("▼ 会場の住所がわからない場合はこちら")
-st.link_button("🗺️ Googleマップで住所を検索する", google_maps_url)
+st.link_button("📍 Googleマップで住所を検索", google_maps_url)
 
 address = st.text_input("会場住所", "東京都江戸川区小松川２丁目１０−２")
 
@@ -93,6 +87,17 @@ with col5:
     match_start = st.text_input("試合開始予定", key="match_start")
 with col6:
     match_end = st.text_input("試合終了予定", key="match_end")
+
+# ------------------------------------------
+# 【追加機能】新宿からの乗換案内（電車・バス）
+# ------------------------------------------
+st.subheader("🚃 新宿駅からの乗換案内")
+st.write("入力された住所（または会場名）までの電車・バスの経路を調べます。")
+encoded_origin = urllib.parse.quote("新宿駅")
+# 住所が入力されていれば住所を、なければ会場名を目的地にする
+encoded_destination = urllib.parse.quote(address if address else venue_name)
+route_url = f"https://www.google.com/maps/dir/?api=1&origin={encoded_origin}&destination={encoded_destination}&travelmode=transit"
+st.link_button("🗺️ 新宿駅からの経路をGoogleマップで検索", route_url)
 
 
 # ==========================================
