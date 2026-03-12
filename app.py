@@ -1,3 +1,4 @@
+
 import streamlit as st
 import re
 from datetime import datetime
@@ -56,12 +57,11 @@ if st.button("✨ テキストから日時や場所を自動入力"):
 st.header("1. 会場・住所の設定")
 venue_name = st.text_input("会場名（学校名や体育館名）", key="venue_name")
 
-# 会場名のみでのGoogleマップ検索
 encoded_venue = urllib.parse.quote(venue_name)
-google_maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_venue}"
+google_maps_search_url = f"https://www.google.com/maps/search/?api=1&query={encoded_venue}"
 
 st.write("▼ 会場の住所がわからない場合はこちら")
-st.link_button("📍 Googleマップで住所を検索", google_maps_url)
+st.link_button("📍 Googleマップで住所を検索", google_maps_search_url)
 
 address = st.text_input("会場住所", "東京都江戸川区小松川２丁目１０−２")
 
@@ -88,16 +88,42 @@ with col5:
 with col6:
     match_end = st.text_input("試合終了予定", key="match_end")
 
+
 # ------------------------------------------
-# 【追加機能】新宿からの乗換案内（電車・バス）
+# 乗換案内（電車・バス）到着時間指定
 # ------------------------------------------
 st.subheader("🚃 新宿駅からの乗換案内")
-st.write("入力された住所（または会場名）までの電車・バスの経路を調べます。")
+st.write("現地集合時間に間に合う電車・バスの経路を調べます。")
 encoded_origin = urllib.parse.quote("新宿駅")
-# 住所が入力されていれば住所を、なければ会場名を目的地にする
 encoded_destination = urllib.parse.quote(address if address else venue_name)
-route_url = f"https://www.google.com/maps/dir/?api=1&origin={encoded_origin}&destination={encoded_destination}&travelmode=transit"
-st.link_button("🗺️ 新宿駅からの経路をGoogleマップで検索", route_url)
+
+# ① Google Maps URL (到着時間指定は公式連携でサポートされていないため通常検索)
+route_url_google = f"https://www.google.com/maps/dir/?api=1&origin={encoded_origin}&destination={encoded_destination}&travelmode=transit"
+
+# ② Yahoo乗換案内 URL (日付・到着時間の自動計算)
+try:
+    # 入力された時間（例：7:50）をプログラム用の時間に変換
+    local_time_obj = datetime.strptime(time_local.replace('：', ':'), "%H:%M").time()
+    
+    y = date.year
+    m = f"{date.month:02}"
+    d = f"{date.day:02}"
+    hh = f"{local_time_obj.hour:02}"
+    m1 = str(local_time_obj.minute // 10)
+    m2 = str(local_time_obj.minute % 10)
+    
+    # type=4 がYahooの「到着時刻指定」
+    yahoo_url = f"https://transit.yahoo.co.jp/search/result?from={encoded_origin}&to={encoded_destination}&y={y}&m={m}&d={d}&hh={hh}&m1={m1}&m2={m2}&type=4"
+except:
+    yahoo_url = f"https://transit.yahoo.co.jp/search/result?from={encoded_origin}&to={encoded_destination}&type=4"
+
+st.info("💡 **到着時間の自動指定について**\n\nGoogleマップはURLから到着時間を指定する機能が塞がれてしまったため、時間ピッタリの検索には **Yahoo!乗換案内** のボタンをご利用ください！")
+
+colA, colB = st.columns(2)
+with colA:
+    st.link_button("🟩 Yahoo!乗換案内（到着時間 指定）", yahoo_url)
+with colB:
+    st.link_button("🗺️ Googleマップ（時間指定 なし）", route_url_google)
 
 
 # ==========================================
