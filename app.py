@@ -20,8 +20,8 @@ if 'match_end' not in st.session_state: st.session_state.match_end = "12:30"
 # 0. コピペで自動抽出機能
 # ==========================================
 st.header("0. 案内文から自動入力 🪄")
-st.caption("LINE等で送られてきた試合の案内文をコピペしてボタンを押すと、下の項目を自動で埋めます！")
-pasted_text = st.text_area("ここに案内文を貼り付け", height=100, placeholder="例：3/20 新宿6:50集合 江戸川区立小松川第二中学校 試合8:00~12:30")
+st.caption("案内文をコピペしてボタンを押すと、下の項目を自動で埋めます。")
+pasted_text = st.text_area("ここに案内文を貼り付け", height=100, placeholder="例：3/20 新宿6:50集合 江戸川区立小松川第二中学校")
 
 if st.button("✨ テキストから日時や場所を自動入力"):
     if pasted_text:
@@ -47,14 +47,13 @@ if st.button("✨ テキストから日時や場所を自動入力"):
         if venue_match:
             st.session_state.venue_name = venue_match.group(1)
 
-        st.success("読み込み完了！下の項目に反映しました")
-
+        st.success("読み込み完了！")
 
 # ==========================================
 # 1. 会場・住所の設定
 # ==========================================
 st.header("1. 会場・住所の設定")
-venue_name = st.text_input("会場名（学校名や体育館名）", key="venue_name")
+venue_name = st.text_input("会場名", key="venue_name")
 
 encoded_venue = urllib.parse.quote(venue_name)
 google_maps_search_url = f"https://www.google.com/maps/search/?api=1&query={encoded_venue}"
@@ -63,7 +62,6 @@ st.write("▼ 会場の住所がわからない場合はこちら")
 st.link_button("📍 Googleマップで住所を検索", google_maps_search_url)
 
 address = st.text_input("会場住所", "東京都江戸川区小松川２丁目１０−２")
-
 
 # ==========================================
 # 2. 日時・スケジュールの設定
@@ -87,118 +85,39 @@ with col5:
 with col6:
     match_end = st.text_input("試合終了予定", key="match_end")
 
-
-# ------------------------------------------
-# 乗換案内（電車・バス）到着時間指定
-# ------------------------------------------
+# --- 経路検索 ---
 st.subheader("🚃 新宿駅からの乗換案内")
-st.write("現地集合時間に間に合う電車・バスの経路を調べます。")
 encoded_origin = urllib.parse.quote("新宿駅")
 encoded_destination = urllib.parse.quote(address if address else venue_name)
 
-# ① Google Maps URL
-route_url_google = f"https://www.google.com/maps/dir/?api=1&origin={encoded_origin}&destination={encoded_destination}&travelmode=transit"
-
-# ② Yahoo乗換案内 URL
 try:
     local_time_obj = datetime.strptime(time_local.replace('：', ':'), "%H:%M").time()
-    
-    y = date.year
-    m = f"{date.month:02}"
-    d = f"{date.day:02}"
+    y, m, d = date.year, f"{date.month:02}", f"{date.day:02}"
     hh = f"{local_time_obj.hour:02}"
-    m1 = str(local_time_obj.minute // 10)
-    m2 = str(local_time_obj.minute % 10)
-    
+    m1, m2 = str(local_time_obj.minute // 10), str(local_time_obj.minute % 10)
     yahoo_url = f"https://transit.yahoo.co.jp/search/result?from={encoded_origin}&to={encoded_destination}&y={y}&m={m}&d={d}&hh={hh}&m1={m1}&m2={m2}&type=4"
 except:
     yahoo_url = f"https://transit.yahoo.co.jp/search/result?from={encoded_origin}&to={encoded_destination}&type=4"
 
-colA, colB = st.columns(2)
-with colA:
-    st.link_button("🟩 Yahoo!乗換案内（到着時間 指定）", yahoo_url)
-with colB:
-    st.link_button("🗺️ Googleマップ（時間指定 なし）", route_url_google)
-
+st.link_button("🟩 Yahoo!乗換案内（到着時間 指定）", yahoo_url)
 
 # ==========================================
-# 3. カテゴリー・参加費
+# 3. 年代・参加費
 # ==========================================
-st.header("3. カテゴリー・参加費")
+st.header("3. 年代・参加費")
 col7, col8 = st.columns(2)
 with col7:
     gender = st.selectbox("性別", ["男子", "女子", "男女"])
 with col8:
-    # ここに U10, U14, U12/14 を追加しました
     age_group = st.selectbox("年代", ["U10", "U12", "U14", "U15", "U12/14", "U12/15"])
 
-fee_option = st.radio("参加費", ["無し", "有り（金額を手入力）"], horizontal=True)
-if fee_option == "有り（金額を手入力）":
-    fee = st.text_input("参加費を入力", "1,000円")
-else:
-    fee = "無し"
-
+fee_option = st.radio("参加費", ["無し", "有り（手入力）"], horizontal=True)
+fee = st.text_input("金額", "1,000円") if fee_option == "有り（手入力）" else "無し"
 
 # ==========================================
-# 4. 緊急連絡先
+# 4. 駐車場・注意事項 (新規追加)
 # ==========================================
-st.header("4. 緊急連絡先")
+st.header("4. 駐車場・注意事項")
 
-CONTACTS = {
-    "鎌田": "080-4835-1204",
-    "髙草": "080-2335-6985",
-    "その他（手入力）": ""
-}
-
-contact_choice = st.selectbox("担当者を選択", list(CONTACTS.keys()))
-
-col9, col10 = st.columns(2)
-with col9:
-    contact_name = st.text_input("担当者名", contact_choice if contact_choice != "その他（手入力）" else "")
-with col10:
-    contact_phone = st.text_input("電話番号", CONTACTS.get(contact_choice, "") if contact_choice != "その他（手入力）" else "")
-
-
-# ==========================================
-# 告知文の組み立てロジック
-# ==========================================
-weeks = ["月", "火", "水", "木", "金", "土", "日"]
-day_of_week = weeks[date.weekday()]
-if is_holiday:
-    day_of_week += "・祝"
-
-category_text = f"{gender}{age_group}"
-
-result_text = f"""【{date.month}/{date.day}({day_of_week}) {venue_name}】
-
-＜集合時間＞
-①新宿駅南口 集合時間 {time_shinjuku}
-②現地集合 集合時間 {time_local}
-ノートのコメント欄に移動方法をお願いします。
-
-＜カテゴリー＞
-{category_text}
-
-＜試合時間（予定）＞
-・{match_start}~{match_end}
-
-〈参加費〉
-{fee}
-
-＜試合会場＞
-・{venue_name}
-{address}
-
-＜緊急連絡先＞
-・{contact_name}
-{contact_phone}
-＊当日急な体調不良やトラブルなどありましたらご連絡ください。"""
-
-
-# ==========================================
-# 5. 画面表示
-# ==========================================
-st.divider()
-st.subheader("📝 完成した告知文")
-st.code(result_text, language="text")
-st.info("右上のアイコンをタップしてコピーし、ノート等に貼り付けてください。")
+# 駐車場の選択肢
+parking_status = st.radio("駐車場の有無", ["無し
